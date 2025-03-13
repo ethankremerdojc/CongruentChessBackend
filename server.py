@@ -5,28 +5,30 @@ app = FastAPI()
 
 # Store active WebSocket connections
 active_connections: List[WebSocket] = []
-
-"""
-
-implement a dict system so we don't need to iterate through all connections to send a message to a specific one
-
-active_connections: Dict[str, WebSocket] = {}
-
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await websocket.accept()
-    active_connections[client_id] = websocket
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # Send message back only to the sender
-            await websocket.send_text(f"Message received: {data}")
-    except WebSocketDisconnect:
-        del active_connections[client_id]
-
-"""
-
 from validation import *
+
+
+
+"""
+
+    implement a dict system so we don't need to iterate through all connections to send a message to a specific one
+
+    active_connections: Dict[str, WebSocket] = {}
+
+    @app.websocket("/ws/{client_id}")
+    async def websocket_endpoint(websocket: WebSocket, client_id: str):
+        await websocket.accept()
+        active_connections[client_id] = websocket
+        try:
+            while True:
+                data = await websocket.receive_text()
+                # Send message back only to the sender
+                await websocket.send_text(f"Message received: {data}")
+        except WebSocketDisconnect:
+            del active_connections[client_id]
+
+"""
+
 
 def is_fen(string):
     return string.count("/") == 7
@@ -63,13 +65,24 @@ async def websocket_endpoint(websocket: WebSocket):
                     fen, from_pos_str, to_pos_str = data.split("|")
 
                     board = decode_fen_to_board(fen)
-                    from_pos = (int(from_pos_str[0]), int(from_pos_str[2]))
+                    from_pos = (int(from_pos_str[0]), int(from_pos_str[2])) # 2 because commas 
                     to_pos = (int(to_pos_str[0]), int(to_pos_str[2]))
 
-                    fen = encode_board_to_fen(board)
+                    piece = board[from_pos[1]][from_pos[0]]
+                    
+                    is_valid = is_valid_move(board, from_pos, to_pos, piece)
 
-                    for connection in active_connections:
-                        await connection.send_text(fen)
+                    if is_valid:
+                        board[from_pos[1]][from_pos[0]] = None
+                        board[to_pos[1]][to_pos[0]] = piece
+
+                        fen = encode_board_to_fen(board)
+
+                        for connection in active_connections:
+                            await connection.send_text(fen)
+                    else:
+                        for connection in active_connections:
+                            await connection.send_text("Server failed to validate move.")
 
                 elif "NEWGAME" in data: # Game request
 

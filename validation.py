@@ -134,9 +134,8 @@ def get_legal_king_moves(position):
 
     return legal_moves
 
-def is_valid_move(board, from_pos, to_pos):
+def is_valid_move(board, from_pos, to_pos, piece):
     try:
-        piece = board[from_pos[1]][from_pos[0]]
 
         if piece is None:
             return False
