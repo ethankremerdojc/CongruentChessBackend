@@ -135,23 +135,17 @@ def get_legal_king_moves(position):
     return legal_moves
 
 def is_valid_move(board, from_pos, to_pos, piece):
-    try:
+    print(from_pos, to_pos, piece)
 
-        if piece is None:
-            return False
-
-        if piece.isupper():
-            color = "white"
-        else:
-            color = "black"
-                        
-        piece_type = PIECE_FOR_LETTER[piece.lower()]
-        legal_moves = get_legal_moves(piece_type, color, from_pos)
-
-        if to_pos not in legal_moves:
-            return False
-
-        return True
-
-    except:
+    if piece is None:
         return False
+
+    color = "white" if piece.isupper() else "black"
+                    
+    piece_type = PIECE_FOR_LETTER[piece.lower()]
+    legal_moves = get_legal_moves(piece_type, color, from_pos)
+
+    if (to_pos[0], to_pos[1]) not in legal_moves:
+        return False
+
+    return True
