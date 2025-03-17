@@ -28,22 +28,65 @@ def get_game_by_game_id(game_id):
 def check_validity(data, game):
     from_pos = data['from']
     to_pos = data['to']
-    piece = game['board_state'][from_pos[1]][from_pos[0]]
 
-    return is_valid_move(game['board_state'], from_pos, to_pos, piece)
+    return is_valid_move(game['board_state'], from_pos, to_pos, data['piece'])
 
-def handle_piece_move(from_pos, to_pos, game):
+def handle_piece_moves(moves, game):
 
-    piece = game['board_state'][from_pos[1]][from_pos[0]]
+    if len(moves) != 2:
+        raise Exception("Invalid number of moves")
     
-    game['board_state'][from_pos[1]][from_pos[0]] = None
-    game['board_state'][to_pos[1]][to_pos[0]] = piece
+    first_move = moves[0]
+    second_move = moves[1]
 
-    game['moves'].append({
-        "from": from_pos,
-        "to": to_pos,
-        "piece": piece
-    })
+    game['board_state'][first_move['from'][1]][first_move['from'][0]] = None
+    game['board_state'][second_move['from'][1]][second_move['from'][0]] = None
+
+    if first_move['to'] == second_move['to']: # Both players are going to the same space.
+        # Remove pawns
+        # If pieces are both not pawns remove both
+
+        both_are_pawns = first_move['piece'].lower() == "p" and second_move['piece'].lower() == "p"
+        both_are_not_pawns = first_move['piece'].lower() != "p" and second_move['piece'].lower() != "p"
+
+        if both_are_pawns or both_are_not_pawns:
+            game['board_state'][first_move['to'][1]][first_move['to'][0]] = None
+        else:
+            # Whichever is not a pawn, set that one.
+            non_pawn = first_move['piece'] if first_move['piece'].lower() != "p" else second_move['piece']
+            game['board_state'][first_move['to'][1]][first_move['to'][0]] = non_pawn
+    else:
+        # First move
+        if first_move['piece'].lower() == "p" and first_move['from'][0] != first_move['to'][0]:
+            # Pawn moving diagonally
+            if game['board_state'][first_move['to'][1]][first_move['to'][0]] is not None: # A piece is there
+                game['board_state'][first_move['to'][1]][first_move['to'][0]] = first_move['piece']
+            else: # Cheating!
+                game['board_state'][first_move['to'][1]][first_move['to'][0]] = None
+        else:
+            game['board_state'][first_move['to'][1]][first_move['to'][0]] = first_move['piece']
+
+        # Second Move
+        if second_move['piece'].lower() == "p" and second_move['from'][0] != second_move['to'][0]:
+            # Pawn moving diagonally
+            if game['board_state'][second_move['to'][1]][second_move['to'][0]] is not None: # A piece is there
+                game['board_state'][second_move['to'][1]][second_move['to'][0]] = second_move['piece']
+            else: # Cheating!
+                game['board_state'][second_move['to'][1]][second_move['to'][0]] = None            
+        else:
+            game['board_state'][second_move['to'][1]][second_move['to'][0]] = second_move['piece']
+
+    for move in moves:
+        game['moves'].append(move)
+
+def get_previous_selections(moves):
+    result = []
+
+    for move in moves:
+        result.append(move['from'])
+        result.append(move['to'])
+
+    return result
 
 def get_connections_by_game_id(game_id):
     return [connection for connection in active_connections if connection[1] == game_id]
@@ -109,10 +152,10 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
 
             if data['request_type'] == "move":
 
+                piece = game['board_state'][data['from'][1]][data['from'][0]]
+                data['piece'] = piece
+
                 is_valid = check_validity(data, game)
-                # if valid and the user is first to submit, add to the temp_moves
-                # if valid and the user is second to submit, apply both moves
-                # if invalid, send error message to just the user who sent invalid move
 
                 if is_valid:
 
@@ -133,9 +176,9 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
                     else:
                         game['temp_moves'].append(data)
 
-                        for move in game['temp_moves']:
-                            handle_piece_move(move['from'], move['to'], game)
+                        handle_piece_moves(game['temp_moves'], game)
 
+                        game['previous_selections'] = get_previous_selections(game['temp_moves'])
                         game['temp_moves'] = []
                 
                         for connection in connections:
