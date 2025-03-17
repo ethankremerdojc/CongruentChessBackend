@@ -20,24 +20,6 @@ def decode_fen_to_board(fen):
         board.append(board_row)
     return board
 
-def encode_board_to_fen(board):
-    fen = []
-    for row in board:
-        empty = 0
-        fen_row = ""
-        for cell in row:
-            if cell is None:
-                empty += 1
-            else:
-                if empty > 0:
-                    fen_row += str(empty)
-                    empty = 0
-                fen_row += cell
-        if empty > 0:
-            fen_row += str(empty)
-        fen.append(fen_row)
-    return "/".join(fen)
-
 def get_legal_moves(piece_type, color, position):
     if piece_type == "pawn":
         return get_legal_pawn_moves(color, position)
