@@ -6,6 +6,8 @@ from utils import *
 import random
 from typing import List, Dict
 
+from orm import Games, Moves
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -16,14 +18,10 @@ app.add_middleware(
 )
 
 active_connections: List[tuple[WebSocket, str]] = []
-games: List[Dict] = []
+# games: List[Dict] = []
 
 def get_game_by_game_id(game_id):
-    for game in games:
-        if game['game_id'] == game_id:
-            return game
-
-    return None
+    return Games.get_by_id(int(game_id))
 
 def get_connections_by_game_id(game_id):
     return [connection for connection in active_connections if connection[1] == game_id]
@@ -32,16 +30,29 @@ def get_connections_by_game_id(game_id):
 
 @app.get("/games")
 async def get_open_games():
-    return [game for game in games if len(game['player_ids']) == 1]
+    open_games = Games.get_open_games()
+    return open_games
 
 @app.post("/start_game")
 async def create_game(data: Dict):
     user_id = data['user_id']
-    game_id = str(random.randint(1000000000, 9999999999))
+    username = data['username']
+
+    new_row = (
+        str(user_id),
+        username,
+        STARTING_FEN,
+        "NONE"
+    )
+
+    Games.add(new_row)
 
     game = {
         "game_id": game_id,
         "player_ids": [int(user_id)],
+        "usernames": {
+            int(user_id): username
+        },
         "game_state": "NOT STARTED",
         "board_state": decode_fen_to_board(STARTING_FEN),
         "winner": None,
@@ -49,9 +60,14 @@ async def create_game(data: Dict):
         "temp_moves": []
     }
 
-    games.append(game)
-
     return game
+
+"""
+
+TODO Another:
+If there are no connections alive for some game, kill it.
+
+"""
 
 @app.websocket("/ws/{game_id}")
 async def websocket_endpoint(websocket: WebSocket, game_id: str):
@@ -74,10 +90,12 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str):
                 continue
 
             user_id = int(data['user_id'])
+            username = data['username']
 
             #! Join game
             if len(game['player_ids']) == 1 and user_id not in game['player_ids']:
                 game['player_ids'].append(user_id)
+                game['usernames'][user_id] = username
 
             connections = get_connections_by_game_id(game_id)
 
